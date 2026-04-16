@@ -1,0 +1,43 @@
+2026-04-11 20:30:36 [INFO] System started
+2026-04-11 20:30:36 [INFO] Capture thread started
+2026-04-11 20:30:38 [INFO] Detection loop started
+2026-04-11 20:31:38 [INFO] Detection cycle #1 started
+2026-04-11 20:31:38 [INFO] 1 alert(s) fired for 0.0.0.0
+2026-04-11 20:31:38 [INFO] 2 alert(s) fired for 192.168.1.11
+2026-04-11 20:32:38 [INFO] Detection cycle #2 started
+2026-04-11 20:32:38 [INFO] 0 alert(s) fired for 0.0.0.0
+2026-04-11 20:32:38 [INFO] 0 alert(s) fired for 192.168.1.11
+2026-04-11 20:33:11 [INFO] System stopped by user
+2026-04-11 20:33:14 [INFO] System started
+2026-04-11 20:33:14 [INFO] Capture thread started
+2026-04-11 20:33:16 [INFO] Detection loop started
+2026-04-11 20:34:16 [INFO] Detection cycle #1 started
+2026-04-11 20:34:16 [INFO] 1 alert(s) fired for 0.0.0.0
+2026-04-11 20:34:16 [INFO] 2 alert(s) fired for 192.168.1.11
+2026-04-11 20:35:16 [INFO] Detection cycle #2 started
+2026-04-11 20:35:17 [INFO] 0 alert(s) fired for 0.0.0.0
+2026-04-11 20:35:17 [INFO] 0 alert(s) fired for 192.168.1.11
+2026-04-11 20:36:17 [INFO] Detection cycle #3 started
+2026-04-11 20:36:17 [INFO] 1 alert(s) fired for 0.0.0.0
+2026-04-11 20:36:17 [INFO] 2 alert(s) fired for 192.168.1.11
+2026-04-11 20:37:17 [INFO] Detection cycle #4 started
+2026-04-11 20:37:17 [INFO] 0 alert(s) fired for 0.0.0.0
+2026-04-11 20:37:17 [INFO] 0 alert(s) fired for 192.168.1.11
+2026-04-11 20:38:17 [INFO] Detection cycle #5 started
+2026-04-11 20:38:17 [INFO] 1 alert(s) fired for 0.0.0.0
+2026-04-11 20:38:17 [INFO] 1 alert(s) fired for 192.168.1.11
+2026-04-11 20:39:17 [INFO] Detection cycle #6 started
+2026-04-11 20:39:17 [INFO] 0 alert(s) fired for 0.0.0.0
+2026-04-11 20:39:17 [INFO] 0 alert(s) fired for 192.168.1.11
+2026-04-11 20:39:54 [INFO] System stopped by user
+2026-04-11 20:39:54 [ERROR] Error on reading from the event loop self pipe
+loop: <ProactorEventLoop running=True closed=False debug=False>
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\asyncio\proactor_events.py", line 801, in _loop_self_reading
+    f = self._proactor.recv(self._ssock, 4096)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\asyncio\windows_events.py", line 459, in recv
+    self._register_with_iocp(conn)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\asyncio\windows_events.py", line 760, in _register_with_iocp
+    _overlapped.CreateIoCompletionPort(obj.fileno(), self._iocp, 0, 0)
+OSError: [WinError 87] The parameter is incorrect

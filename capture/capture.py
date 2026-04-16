@@ -7,6 +7,7 @@ from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.db_helper import insert_traffic
+from ip_checker import tag_ip
 
 INTERFACE = r"\Device\NPF_{C18DB8E1-C4AB-447E-AC75-CB565452B269}"
 TSHARK_PATH = r"C:\Program Files\Wireshark\tshark.exe"
@@ -41,6 +42,12 @@ def get_packet_size(packet):
     except: return 0
 
 def start_capture():
+    import asyncio
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+
     print(f"[*] Starting live capture on Wi-Fi...")
     print(f"[*] Press Ctrl+C to stop\n")
 
