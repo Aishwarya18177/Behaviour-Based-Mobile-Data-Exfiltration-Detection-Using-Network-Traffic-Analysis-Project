@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Exfiltration Detector — Live Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap');
+ 
+:root {
+  --bg:        #080d1a;
+  --bg2:       #0d1529;
+  --bg3:       #111e35;
+  --border:    #1e3054;
+  --accent:    #00c8ff;
+  --accent2:   #0077ff;
+  --red:       #ff3b3b;
+  --yellow:    #ffb300;
+  --green:     #00e676;
+  --text:      #e8f0fe;
+  --muted:     #5a7aaa;
+  --card-glow: rgba(0,200,255,0.06);
+}
+ 
+* { margin:0; padding:0; box-sizing:border-box; }
+ 
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+ 
+/* Subtle grid background */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events:none; z-index:0;
+}
+ 
+.wrap { position:relative; z-index:1; max-width:1300px; margin:0 auto; padding:24px; }
+ 
+/* ── Top bar ── */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 24px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius:12px;
+  margin-bottom:24px;
+}
+.topbar-left { display:flex; align-items:center; gap:12px; }
+.logo-icon {
+  width:36px; height:36px; border-radius:8px;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px;
+}
+.logo-text { font-size:16px; font-weight:700; letter-spacing:0.02em; }
+.logo-text span { color:var(--accent); }
+.topbar-right { display:flex; align-items:center; gap:20px; }
+.status-dot {
+  display:flex; align-items:center; gap:8px;
+  font-size:12px; color:var(--muted); font-family:'JetBrains Mono',monospace;
+}
+.dot {
+  width:8px; height:8px; border-radius:50%;
+  background:var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.2)} }
+.refresh-info { font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+ 
+/* ── Stats row ── */
+.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.stat-card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:20px;
+  position:relative; overflow:hidden;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.stat-card:hover { transform:translateY(-2px); border-color:var(--accent); }
+.stat-card::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+}
+.stat-card.total::before  { background: linear-gradient(90deg, var(--accent2), var(--accent)); }
+.stat-card.alerts::before { background: linear-gradient(90deg, #ff1744, var(--red)); }
+.stat-card.unknown::before{ background: linear-gradient(90deg, #ff8f00, var(--yellow)); }
+.stat-card.ips::before    { background: linear-gradient(90deg, #00c853, var(--green)); }
+.stat-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:10px; font-family:'JetBrains Mono',monospace; }
+.stat-value { font-size:38px; font-weight:800; line-height:1; margin-bottom:6px; }
+.stat-card.total  .stat-value { color:var(--accent); }
+.stat-card.alerts .stat-value { color:var(--red); }
+.stat-card.unknown .stat-value{ color:var(--yellow); }
+.stat-card.ips    .stat-value { color:var(--green); }
+.stat-sub { font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+ 
+/* ── Main grid ── */
+.main-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:20px; margin-bottom:20px; }
+ 
+/* ── Panel ── */
+.panel {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden;
+}
+.panel-head {
+  padding:14px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.panel-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; }
+.panel-badge {
+  font-size:10px; font-family:'JetBrains Mono',monospace;
+  padding:3px 8px; border-radius:20px;
+  background:rgba(0,200,255,0.1); color:var(--accent);
+  border:1px solid rgba(0,200,255,0.2);
+}
+.panel-body { padding:16px; max-height:340px; overflow-y:auto; }
+.panel-body::-webkit-scrollbar { width:4px; }
+.panel-body::-webkit-scrollbar-track { background:var(--bg); }
+.panel-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+ 
+/* ── Alert items ── */
+.alert-item {
+  display:flex; gap:12px; align-items:flex-start;
+  padding:12px;
+  border-radius:8px;
+  margin-bottom:8px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  transition:border-color 0.2s;
+  animation: slideIn 0.3s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
+.alert-item:hover { border-color:var(--accent); }
+.alert-item.HIGH   { border-left:3px solid var(--red); }
+.alert-item.MEDIUM { border-left:3px solid var(--yellow); }
+.alert-item.LOW    { border-left:3px solid var(--accent); }
+.sev-badge {
+  font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace;
+  padding:3px 7px; border-radius:4px; white-space:nowrap;
+  margin-top:1px; flex-shrink:0;
+}
+.sev-badge.HIGH   { background:rgba(255,59,59,0.15);  color:var(--red);    border:1px solid rgba(255,59,59,0.3); }
+.sev-badge.MEDIUM { background:rgba(255,179,0,0.15);  color:var(--yellow); border:1px solid rgba(255,179,0,0.3); }
+.sev-badge.LOW    { background:rgba(0,200,255,0.12);  color:var(--accent); border:1px solid rgba(0,200,255,0.25); }
+.alert-content { flex:1; min-width:0; }
+.alert-rule { font-size:12px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--text); margin-bottom:3px; }
+.alert-desc { font-size:11px; color:var(--muted); line-height:1.5; }
+.alert-meta { font-size:10px; color:var(--muted); margin-top:4px; font-family:'JetBrains Mono',monospace; }
+.no-data { text-align:center; padding:40px 20px; color:var(--muted); font-size:13px; }
+.no-data .icon { font-size:32px; margin-bottom:10px; opacity:0.4; }
+ 
+/* ── Payload feed ── */
+.payload-item {
+  padding:10px 12px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:8px;
+  margin-bottom:6px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  animation: slideIn 0.3s ease;
+}
+.payload-time { color:var(--muted); }
+.payload-type { color:var(--yellow); font-weight:700; }
+.payload-type.BULK_EXFILTRATE { color:var(--red); }
+.payload-type.exfiltrate { color:var(--yellow); }
+.payload-type.sync { color:var(--green); }
+.payload-size { color:var(--muted); }
+.payload-preview { color:var(--muted); margin-top:3px; opacity:0.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+ 
+/* ── Full-width packet log ── */
+.packet-log { margin-bottom:20px; }
+.packet-row {
+  display:grid;
+  grid-template-columns:80px 130px 16px 130px 70px 60px 70px;
+  gap:8px;
+  padding:6px 16px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  border-bottom:1px solid rgba(30,48,84,0.5);
+  align-items:center;
+  transition:background 0.15s;
+}
+.packet-row:hover { background:var(--bg3); }
+.packet-row.head { font-weight:700; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; background:var(--bg3); }
+.tag-known   { color:var(--green); }
+.tag-unknown { color:var(--red); }
+.proto-https { color:var(--accent); }
+.proto-tcp   { color:var(--muted); }
+.proto-udp   { color:var(--yellow); }
+.arrow { color:var(--muted); text-align:center; }
+ 
+/* ── Demo controls ── */
+.controls {
+  display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+  margin-bottom:24px;
+  padding:16px 20px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+}
+.controls-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-right:4px; }
+.btn {
+  padding:8px 18px; border-radius:8px; border:none; cursor:pointer;
+  font-family:'Syne',sans-serif; font-size:12px; font-weight:700;
+  letter-spacing:0.04em; transition:all 0.2s; text-transform:uppercase;
+}
+.btn-normal  { background:rgba(0,230,118,0.1);  color:var(--green);  border:1px solid rgba(0,230,118,0.25); }
+.btn-moderate{ background:rgba(255,179,0,0.1);  color:var(--yellow); border:1px solid rgba(255,179,0,0.25); }
+.btn-burst   { background:rgba(255,59,59,0.15); color:var(--red);    border:1px solid rgba(255,59,59,0.3); }
+.btn-clear   { background:rgba(90,122,170,0.1); color:var(--muted);  border:1px solid var(--border); margin-left:auto; }
+.btn:hover   { transform:translateY(-1px); filter:brightness(1.2); }
+.btn:active  { transform:translateY(0); }
+ 
+/* ── Toast notification ── */
+.toast {
+  position:fixed; top:20px; right:20px; z-index:1000;
+  padding:12px 20px; border-radius:10px;
+  font-family:'JetBrains Mono',monospace; font-size:12px;
+  border:1px solid; display:none;
+  animation: toastIn 0.3s ease;
+}
+@keyframes toastIn { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+.toast.HIGH   { background:rgba(255,59,59,0.15);  color:var(--red);    border-color:rgba(255,59,59,0.4); }
+.toast.MEDIUM { background:rgba(255,179,0,0.15);  color:var(--yellow); border-color:rgba(255,179,0,0.4); }
+.toast.LOW    { background:rgba(0,200,255,0.12);  color:var(--accent); border-color:rgba(0,200,255,0.3); }
+</style>
+</head>
+<body>
+ 
+<div class="toast" id="toast"></div>
+ 
+<div class="wrap">
+ 
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo-icon">🛡</div>
+      <div>
+        <div class="logo-text">Exfil<span>Detect</span></div>
+        <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace">Behaviour-Based Detection System</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="status-dot"><div class="dot"></div> MONITORING ACTIVE</div>
+      <div class="refresh-info" id="lastRefresh">Last refresh: —</div>
+    </div>
+  </div>
+ 
+  <!-- Demo controls -->
+  <div class="controls">
+    <span class="controls-label">Simulate:</span>
+    <button class="btn btn-normal"   onclick="simulateNormal()">Normal Traffic</button>
+    <button class="btn btn-moderate" onclick="simulateModerate()">Moderate Attack</button>
+    <button class="btn btn-burst"    onclick="simulateBurst()">🔴 Burst Attack</button>
+    <button class="btn btn-clear"    onclick="clearAll()">Clear All</button>
+  </div>
+ 
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card total">
+      <div class="stat-label">Packets Captured</div>
+      <div class="stat-value" id="statPackets">0</div>
+      <div class="stat-sub">total since startup</div>
+    </div>
+    <div class="stat-card alerts">
+      <div class="stat-label">Alerts Fired</div>
+      <div class="stat-value" id="statAlerts">0</div>
+      <div class="stat-sub">across all rules</div>
+    </div>
+    <div class="stat-card unknown">
+      <div class="stat-label">Unknown IPs</div>
+      <div class="stat-value" id="statUnknown">0</div>
+      <div class="stat-sub">unrecognised destinations</div>
+    </div>
+    <div class="stat-card ips">
+      <div class="stat-label">Active Devices</div>
+      <div class="stat-value" id="statDevices">0</div>
+      <div class="stat-sub">in last 5 minutes</div>
+    </div>
+  </div>
+ 
+  <!-- Main grid -->
+  <div class="main-grid">
+    <!-- Alert feed -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">🚨 Alert Feed</div>
+        <div class="panel-badge" id="alertBadge">0 alerts</div>
+      </div>
+      <div class="panel-body" id="alertFeed">
+        <div class="no-data"><div class="icon">🔍</div>No alerts yet.<br>Run a simulation to trigger detection.</div>
+      </div>
+    </div>
+ 
+    <!-- Payload feed -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">📡 Received Payloads</div>
+        <div class="panel-badge" id="payloadBadge">0 received</div>
+      </div>
+      <div class="panel-body" id="payloadFeed">
+        <div class="no-data"><div class="icon">📭</div>No payloads received yet.</div>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- Live packet log -->
+  <div class="panel packet-log">
+    <div class="panel-head">
+      <div class="panel-title">📶 Live Packet Stream</div>
+      <div class="panel-badge" id="packetBadge">0 packets</div>
+    </div>
+    <div class="panel-body" style="max-height:260px" id="packetFeed">
+      <div class="packet-row head">
+        <span>Time</span><span>Source IP</span><span></span><span>Dest IP</span><span>Protocol</span><span>Size</span><span>Tag</span>
+      </div>
+      <div class="no-data" id="packetEmpty" style="padding:30px"><div class="icon">📡</div>Waiting for packets...</div>
+    </div>
+  </div>
+ 
+</div>
+ 
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let alerts   = [];
+let payloads = [];
+let packets  = [];
+let stats    = { packets:0, alerts:0, unknown:0, devices:0 };
+ 
+// ── Fake data generators ───────────────────────────────────────────────────
+const KNOWN_IPS   = ["192.168.1.1","142.250.77.102","20.213.196.214","13.89.179.8","1.1.1.1","8.8.8.8"];
+const UNKNOWN_IPS = ["185.220.101.5","45.33.32.156","23.94.88.12","91.108.4.1","104.244.42.1","176.9.8.2"];
+const PROTOCOLS   = ["TCP","UDP","HTTPS","HTTP"];
+ 
+function randomIP(unknown) {
+  const list = unknown ? UNKNOWN_IPS : KNOWN_IPS;
+  return list[Math.floor(Math.random() * list.length)];
+}
+function randomProto() { return PROTOCOLS[Math.floor(Math.random() * PROTOCOLS.length)]; }
+function randomSize(min,max) { return Math.floor(Math.random()*(max-min)+min); }
+function nowStr() { return new Date().toLocaleTimeString(); }
+ 
+function addPacket(src, dst, proto, size, tag) {
+  const p = { time:nowStr(), src, dst, proto, size, tag };
+  packets.unshift(p);
+  if (packets.length > 50) packets.pop();
+  stats.packets++;
+  if (tag==="UNKNOWN") stats.unknown++;
+  renderPackets();
+  updateStats();
+}
+ 
+function addAlert(severity, rule, src, desc) {
+  alerts.unshift({ time:nowStr(), severity, rule, src, desc });
+  if (alerts.length > 30) alerts.pop();
+  stats.alerts++;
+  renderAlerts();
+  updateStats();
+  showToast(severity, rule);
+}
+ 
+function addPayload(type, size, preview) {
+  payloads.unshift({ time:nowStr(), type, size, preview });
+  if (payloads.length > 30) payloads.pop();
+  renderPayloads();
+}
+ 
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderAlerts() {
+  const feed = document.getElementById("alertFeed");
+  if (alerts.length === 0) {
+    feed.innerHTML = '<div class="no-data"><div class="icon">🔍</div>No alerts yet.</div>';
+    document.getElementById("alertBadge").textContent = "0 alerts";
+    return;
+  }
+  document.getElementById("alertBadge").textContent = alerts.length + " alert" + (alerts.length>1?"s":"");
+  feed.innerHTML = alerts.map(a => `
+    <div class="alert-item ${a.severity}">
+      <div class="sev-badge ${a.severity}">${a.severity}</div>
+      <div class="alert-content">
+        <div class="alert-rule">${a.rule}</div>
+        <div class="alert-desc">${a.desc}</div>
+        <div class="alert-meta">${a.time} · ${a.src}</div>
+      </div>
+    </div>
+  `).join("");
+}
+ 
+function renderPayloads() {
+  const feed = document.getElementById("payloadFeed");
+  if (payloads.length === 0) {
+    feed.innerHTML = '<div class="no-data"><div class="icon">📭</div>No payloads received yet.</div>';
+    document.getElementById("payloadBadge").textContent = "0 received";
+    return;
+  }
+  document.getElementById("payloadBadge").textContent = payloads.length + " received";
+  feed.innerHTML = payloads.map(p => `
+    <div class="payload-item">
+      <span class="payload-time">[${p.time}]</span>
+      <span class="payload-type ${p.type}"> ${p.type}</span>
+      <span class="payload-size"> · ${p.size}B</span>
+      <div class="payload-preview">${p.preview}</div>
+    </div>
+  `).join("");
+}
+ 
+function renderPackets() {
+  const feed = document.getElementById("packetFeed");
+  const empty = document.getElementById("packetEmpty");
+  if (empty) empty.remove();
+  document.getElementById("packetBadge").textContent = stats.packets + " packets";
+ 
+  const header = feed.querySelector(".packet-row.head");
+  // Remove old rows beyond 20
+  const rows = feed.querySelectorAll(".packet-row:not(.head)");
+  if (rows.length > 20) rows[rows.length-1].remove();
+ 
+  const p = packets[0];
+  const row = document.createElement("div");
+  row.className = "packet-row";
+  const protoClass = p.proto==="HTTPS"?"proto-https":p.proto==="UDP"?"proto-udp":"proto-tcp";
+  const tagClass = p.tag==="KNOWN"?"tag-known":"tag-unknown";
+  row.innerHTML = `
+    <span style="color:var(--muted)">${p.time}</span>
+    <span>${p.src}</span>
+    <span class="arrow">→</span>
+    <span>${p.dst}</span>
+    <span class="${protoClass}">${p.proto}</span>
+    <span style="color:var(--muted)">${p.size}B</span>
+    <span class="${tagClass}">${p.tag}</span>
+  `;
+  feed.insertBefore(row, header ? header.nextSibling : feed.firstChild);
+}
+ 
+function updateStats() {
+  document.getElementById("statPackets").textContent = stats.packets.toLocaleString();
+  document.getElementById("statAlerts").textContent  = stats.alerts;
+  document.getElementById("statUnknown").textContent = stats.unknown;
+  document.getElementById("statDevices").textContent = stats.devices;
+  document.getElementById("lastRefresh").textContent = "Last refresh: " + nowStr();
+}
+ 
+function showToast(severity, rule) {
+  const toast = document.getElementById("toast");
+  toast.className = "toast " + severity;
+  const icons = { HIGH:"🔴", MEDIUM:"⚠️", LOW:"🔵" };
+  toast.textContent = `${icons[severity]} [${severity}] ${rule}`;
+  toast.style.display = "block";
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.style.display="none"; }, 3000);
+}
+ 
+// ── Simulation modes ───────────────────────────────────────────────────────
+function simulateNormal() {
+  stats.devices = Math.max(stats.devices, 2);
+  let i = 0;
+  const run = () => {
+    if (i++ >= 8) return;
+    const unknown = Math.random() < 0.15;
+    addPacket("192.168.1.11", randomIP(unknown), randomProto(), randomSize(54,500), unknown?"UNKNOWN":"KNOWN");
+    setTimeout(run, 600);
+  };
+  run();
+}
+ 
+function simulateModerate() {
+  stats.devices = Math.max(stats.devices, 3);
+  let i = 0;
+  const contacts = '{"contacts":[{"name":"Priya","phone":"9876543210"},{"name":"Rahul","phone":"9123456789"}]}';
+  const run = () => {
+    if (i++ >= 20) return;
+    const unknown = Math.random() < 0.6;
+    addPacket("10.0.2.15", randomIP(unknown), "HTTPS", randomSize(200,1500), unknown?"UNKNOWN":"KNOWN");
+    if (i % 4 === 0) {
+      addPayload("exfiltrate", contacts.length, contacts.substring(0,60)+"...");
+    }
+    if (i === 15) {
+      addAlert("MEDIUM", "FREQUENT_UNKNOWN_CONNECTIONS", "10.0.2.15",
+        "12 out of 20 connections went to unknown destination IPs.");
+      addAlert("LOW", "NEW_UNKNOWN_DESTINATION", "10.0.2.15",
+        "12 packet(s) sent to 4 unknown destination IP(s).");
+    }
+    setTimeout(run, 300);
+  };
+  run();
+}
+ 
+function simulateBurst() {
+  stats.devices = Math.max(stats.devices, 4);
+  let i = 0;
+  const bigPayload = '{"type":"BULK_EXFILTRATE","contacts":[...],"messages":[...],"location":{"lat":13.08,"lng":80.27},"padding":"XXXXX..."}';
+  const run = () => {
+    if (i++ >= 50) return;
+    addPacket("10.0.2.15", randomIP(true), "HTTPS", randomSize(1200,1500), "UNKNOWN");
+    if (i % 5 === 0) {
+      addPayload("BULK_EXFILTRATE", 5200 + i*100, bigPayload.substring(0,70)+"...");
+    }
+    if (i === 10) {
+      addAlert("HIGH", "HIGH_VOLUME_UPLOAD", "10.0.2.15",
+        "Upload volume 620,000 bytes exceeds threshold of 500,000 bytes in 5 minutes.");
+    }
+    if (i === 20) {
+      addAlert("HIGH", "NON_STANDARD_PORT", "10.0.2.15",
+        "Data transmitted over non-standard port(s): [8080, 4444]. Possible tunnelling.");
+    }
+    if (i === 30) {
+      addAlert("MEDIUM", "FREQUENT_UNKNOWN_CONNECTIONS", "10.0.2.15",
+        "28 out of 30 connections went to unknown destination IPs.");
+    }
+    setTimeout(run, 80);
+  };
+  run();
+}
+ 
+function clearAll() {
+  alerts=[]; payloads=[]; packets=[]; stats={packets:0,alerts:0,unknown:0,devices:0};
+  renderAlerts(); renderPayloads();
+  document.getElementById("packetFeed").innerHTML = `
+    <div class="packet-row head"><span>Time</span><span>Source IP</span><span></span><span>Dest IP</span><span>Protocol</span><span>Size</span><span>Tag</span></div>
+    <div class="no-data" id="packetEmpty" style="padding:30px"><div class="icon">📡</div>Waiting for packets...</div>
+  `;
+  document.getElementById("packetBadge").textContent = "0 packets";
+  updateStats();
+}
+ 
+// ── Auto-refresh from Flask API (when deployed) ───────────────────────────
+function tryFetchFromServer() {
+  fetch("/api/stats").then(r=>r.json()).then(d=>{
+    if(d.total_packets !== undefined) {
+      document.getElementById("statPackets").textContent = d.total_packets.toLocaleString();
+      document.getElementById("statAlerts").textContent  = d.alert_count;
+      document.getElementById("statUnknown").textContent = d.unknown_ips;
+    }
+  }).catch(()=>{});
+ 
+  fetch("/api/alerts").then(r=>r.json()).then(data=>{
+    if(!Array.isArray(data) || data.length===0) return;
+    const feed = document.getElementById("alertFeed");
+    document.getElementById("alertBadge").textContent = data.length + " alerts";
+    feed.innerHTML = data.map(a => `
+      <div class="alert-item ${a.severity}">
+        <div class="sev-badge ${a.severity}">${a.severity}</div>
+        <div class="alert-content">
+          <div class="alert-rule">${a.rule_name}</div>
+          <div class="alert-desc">${a.description||""}</div>
+          <div class="alert-meta">${(a.timestamp||"").substring(11,19)} · ${a.src_ip}</div>
+        </div>
+      </div>
+    `).join("");
+  }).catch(()=>{});
+}
+ 
+// Try server every 5s; works both standalone and with Flask
+setInterval(tryFetchFromServer, 5000);
+tryFetchFromServer();
+</script>
+</body>
+</html>
